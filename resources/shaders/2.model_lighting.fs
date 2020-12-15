@@ -13,6 +13,8 @@ struct PointLight {
     float quadratic;
 };
 
+//Misko dal radi
+
 struct Material {
     sampler2D texture_diffuse1;
     sampler2D texture_specular1;
