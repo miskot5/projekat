@@ -14,6 +14,8 @@
 #include <learnopengl/camera.h>
 #include <learnopengl/model.h>
 
+//toza pomaze
+
 #include <iostream>
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
