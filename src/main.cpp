@@ -23,8 +23,8 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 30.0f));
-float lastX = SCR_WIDTH / 2.0f;
+Camera camera(glm::vec3(0.0f, 1.0f, 10.0f));
+float lastX = SCR_WIDTH / 2.0f ;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
@@ -32,6 +32,17 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+struct PointLight{
+    glm::vec3 position;
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+
+    float constant;
+    float linear;
+    float quadratic;
+
+};
 
 int main()
 {
@@ -72,9 +83,21 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
 
-    Shader churchShader("churchVertex.vs", "churchFragment.fs");
-    Model churchModel(FileSystem::getPath("resources/objects/church/aberkios_100k_texture.obj"));
+    Shader church_shader("church_vertex.vs", "church_fragment.fs");
+    Model church_model(FileSystem::getPath("resources/objects/church/aberkios_100k_texture.obj"));
 
+    Shader sun_shader("sun_vertex.vs", "sun_fragment.fs");
+    Model sun_model(FileSystem::getPath("resources/objects/planet/planet.obj"));
+    sun_model.SetShaderTextureNamePrefix("material.");
+
+    PointLight pointLight;
+    pointLight.position = glm::vec3(4.0f, 40.f, 0.0f);
+    pointLight.ambient = glm::vec3(0.4f, 0.4f, 0.2f);
+    pointLight.diffuse = glm::vec3(0.6f, 0.5f, 0.6f);
+    pointLight.specular = glm::vec3(1.0f, 1.0f, 1.0f);
+    pointLight.constant = 1.0f;
+    pointLight.linear = 1.0f;
+    pointLight.quadratic = 0.32f;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -90,23 +113,51 @@ int main()
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        churchShader.use();
+        glm::vec3 sun_pos = glm::vec3(5.0f, 15.0f * cos(currentFrame) , 15.0f * sin(currentFrame));
+        //glm::vec3 sun_pos = glm::vec3(5.0f, 8.0f , 7.0f);
+
+        church_shader.use();
+
+        pointLight.position = sun_pos;
+        church_shader.setVec3("pointLight.position", pointLight.position);
+        church_shader.setVec3("pointLight.ambient", pointLight.ambient);
+        church_shader.setVec3("pointLight.diffuse", pointLight.diffuse);
+        church_shader.setVec3("pointLight.specular", pointLight.specular);
+        church_shader.setFloat("pointLight.constant", pointLight.constant);
+        //church_shader.setFloat("pointLight.linear", pointLight.linear);
+        //church_shader.setFloat("pointLight.quadratic", pointLight.quadratic);
+        church_shader.setFloat("material.shininess", 32.0f);
+        church_shader.setVec3("viewPosition", camera.Position);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
-        churchShader.setMat4("projection", projection);
-        churchShader.setMat4("view", view);
+        church_shader.setMat4("projection", projection);
+        church_shader.setMat4("view", view);
 
         // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(1.5f, -4.0f, 0.0f)); // translate it down so it's at the center of the scene
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
         model = glm::rotate(model,glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::scale(model, glm::vec3(0.8f));	// it's a bit too big for our scene, so scale it down
-        churchShader.setMat4("model", model);
+        model = glm::scale(model, glm::vec3(0.2f));	// it's a bit too big for our scene, so scale it down
+        church_shader.setMat4("model", model);
 
-        churchModel.Draw(churchShader);
+        church_model.Draw(church_shader);
+
+        sun_shader.use();
+
+        projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        view = camera.GetViewMatrix();
+        sun_shader.setMat4("projection", projection);
+        sun_shader.setMat4("view", view);
+        sun_shader.setVec3("sun_color", glm::vec3(1.0f, 1.0f, 0.3f));
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, sun_pos);
+        model = glm::scale(model, glm::vec3(0.1f));	// it's a bit too big for our scene, so scale it down
+        church_shader.setMat4("model", model);
+        sun_model.Draw(sun_shader);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
