@@ -44,6 +44,18 @@ struct PointLight{
 
 };
 
+struct DirLight {
+    glm::vec3 direction;
+
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+};
+
+struct DayTime{
+    float day_angle; //angle of sun position
+};
+
 int main()
 {
     // glfw: initialize and configure
@@ -90,14 +102,16 @@ int main()
     Model sun_model(FileSystem::getPath("resources/objects/planet/planet.obj"));
     sun_model.SetShaderTextureNamePrefix("material.");
 
-    PointLight pointLight;
-    pointLight.position = glm::vec3(4.0f, 40.f, 0.0f);
-    pointLight.ambient = glm::vec3(0.4f, 0.4f, 0.2f);
-    pointLight.diffuse = glm::vec3(0.6f, 0.5f, 0.6f);
-    pointLight.specular = glm::vec3(1.0f, 1.0f, 1.0f);
-    pointLight.constant = 1.0f;
-    pointLight.linear = 1.0f;
-    pointLight.quadratic = 0.32f;
+    DayTime sun_daytime;
+    sun_daytime.day_angle = 90.0f;
+
+
+    DirLight sun_light;
+    sun_light.direction = glm::vec3(4.0f, 40.f, 0.0f);
+    sun_light.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+    //sun_light.diffuse = glm::vec3(0.6f, 0.5f, 0.6f);
+    sun_light.diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
+    sun_light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -113,21 +127,23 @@ int main()
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::vec3 sun_pos = glm::vec3(5.0f, 15.0f * cos(currentFrame) , 15.0f * sin(currentFrame));
-        //glm::vec3 sun_pos = glm::vec3(5.0f, 8.0f , 7.0f);
+        sun_daytime.day_angle = currentFrame * 70;
+        float sun_time_angle = sun_daytime.day_angle;
+        float sun_time_radians = glm::radians(sun_time_angle);
+        float sun_time_power = max(sin(sun_time_radians), 0.0f);
+        glm::vec3 sun_time_position =
+                glm::vec3(5.0f, sin(sun_time_radians)*10.0f - 2.0f, -cos(sun_time_radians)*12.0f);
 
         church_shader.use();
 
-        pointLight.position = sun_pos;
-        church_shader.setVec3("pointLight.position", pointLight.position);
-        church_shader.setVec3("pointLight.ambient", pointLight.ambient);
-        church_shader.setVec3("pointLight.diffuse", pointLight.diffuse);
-        church_shader.setVec3("pointLight.specular", pointLight.specular);
-        church_shader.setFloat("pointLight.constant", pointLight.constant);
-        //church_shader.setFloat("pointLight.linear", pointLight.linear);
-        //church_shader.setFloat("pointLight.quadratic", pointLight.quadratic);
-        church_shader.setFloat("material.shininess", 32.0f);
+        sun_light.direction = sun_time_position;
+        church_shader.setVec3("light.direction", sun_light.direction);
         church_shader.setVec3("viewPosition", camera.Position);
+        church_shader.setVec3("light.ambient", sun_light.ambient);
+        church_shader.setVec3("light.diffuse", sun_light.diffuse);
+        //church_shader.setVec3("light.specular", sun_light.specular);
+        //church_shader.setFloat("material.shininess", 1.0f);
+        //church_shader.setFloat("light.power", sun_time_power);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -151,12 +167,12 @@ int main()
         view = camera.GetViewMatrix();
         sun_shader.setMat4("projection", projection);
         sun_shader.setMat4("view", view);
-        sun_shader.setVec3("sun_color", glm::vec3(1.0f, 1.0f, 0.3f));
+        sun_shader.setVec3("sun_color", glm::vec3(max(sun_time_power*0.5+0.5, 1.0), sun_time_power*0.85+0.15, sun_time_power*0.3)*sun_time_power);
 
         model = glm::mat4(1.0f);
-        model = glm::translate(model, sun_pos);
-        model = glm::scale(model, glm::vec3(0.1f));	// it's a bit too big for our scene, so scale it down
-        church_shader.setMat4("model", model);
+        model = glm::translate(model, sun_time_position);
+        model = glm::scale(model, glm::vec3(0.05f));	// it's a bit too big for our scene, so scale it down
+        sun_shader.setMat4("model", model);
         sun_model.Draw(sun_shader);
 
         glfwSwapBuffers(window);
