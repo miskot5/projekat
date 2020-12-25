@@ -141,9 +141,9 @@ int main()
         church_shader.setVec3("viewPosition", camera.Position);
         church_shader.setVec3("light.ambient", sun_light.ambient);
         church_shader.setVec3("light.diffuse", sun_light.diffuse);
-        //church_shader.setVec3("light.specular", sun_light.specular);
-        //church_shader.setFloat("material.shininess", 1.0f);
-        //church_shader.setFloat("light.power", sun_time_power);
+        church_shader.setVec3("light.specular", sun_light.specular);
+        church_shader.setFloat("material.shininess", 1.0f);
+        church_shader.setFloat("light.power", sun_time_power);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
