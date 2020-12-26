@@ -18,7 +18,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+unsigned int load_cubemap(vector<std::string> faces);
 void calculate_day(float angle);
+
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -34,18 +36,6 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-struct PointLight{
-    glm::vec3 position;
-    glm::vec3 ambient;
-    glm::vec3 diffuse;
-    glm::vec3 specular;
-
-    float constant;
-    float linear;
-    float quadratic;
-
-};
-
 struct DirLight {
     glm::vec3 direction;
 
@@ -54,13 +44,6 @@ struct DirLight {
     glm::vec3 specular;
 };
 
-/*struct DayTime{
-    float angle; //angle of sun position
-    float radians;
-    float light_power;
-    glm::vec3 position;
-    glm::vec3 color;
-};*/
 DayProp sun_prop;
 
 int main()
@@ -99,7 +82,6 @@ int main()
         return -1;
     }
 
-
     glEnable(GL_DEPTH_TEST);
 
     Shader church_shader("church_vertex.vs", "church_fragment.fs");
@@ -109,11 +91,82 @@ int main()
     Model sun_model(FileSystem::getPath("resources/objects/planet/planet.obj"));
     sun_model.SetShaderTextureNamePrefix("material.");
 
+    Shader skybox_shader("skybox_vertex.vs", "skybox_fragment.fs");
+
+    float skyboxVertices[] = {
+            // positions
+            -1.0f,  1.0f, -1.0f,
+            -1.0f, -1.0f, -1.0f,
+             1.0f, -1.0f, -1.0f,
+             1.0f, -1.0f, -1.0f,
+             1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,
+
+            -1.0f, -1.0f,  1.0f,
+            -1.0f, -1.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f,  1.0f,
+            -1.0f, -1.0f,  1.0f,
+
+            1.0f, -1.0f, -1.0f,
+            1.0f, -1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f, -1.0f,
+            1.0f, -1.0f, -1.0f,
+
+            -1.0f, -1.0f,  1.0f,
+            -1.0f,  1.0f,  1.0f,
+             1.0f,  1.0f,  1.0f,
+             1.0f,  1.0f,  1.0f,
+             1.0f, -1.0f,  1.0f,
+            -1.0f, -1.0f,  1.0f,
+
+            -1.0f,  1.0f, -1.0f,
+             1.0f,  1.0f, -1.0f,
+             1.0f,  1.0f,  1.0f,
+             1.0f,  1.0f,  1.0f,
+            -1.0f,  1.0f,  1.0f,
+            -1.0f,  1.0f, -1.0f,
+
+            -1.0f, -1.0f, -1.0f,
+            -1.0f, -1.0f,  1.0f,
+             1.0f, -1.0f, -1.0f,
+             1.0f, -1.0f, -1.0f,
+            -1.0f, -1.0f,  1.0f,
+             1.0f, -1.0f,  1.0f
+    };
+
+    vector<std::string> faces
+            {
+                    FileSystem::getPath("resources/textures/skybox/right.jpg"),
+                    FileSystem::getPath("resources/textures/skybox/left.jpg"),
+                    FileSystem::getPath("resources/textures/skybox/top.jpg"),
+                    FileSystem::getPath("resources/textures/skybox/bottom.jpg"),
+                    FileSystem::getPath("resources/textures/skybox/front.jpg"),
+                    FileSystem::getPath("resources/textures/skybox/back.jpg")
+            };
+
+    unsigned int cubemap_texture = load_cubemap(faces);
+
+    skybox_shader.use();
+    skybox_shader.setInt("skybox", 0);
+
     DirLight sun_light;
     sun_light.direction = glm::vec3(4.0f, 40.f, 0.0f);
     sun_light.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
     sun_light.diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
     sun_light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
+
+    unsigned int skyboxVAO, skyboxVBO;
+    glGenVertexArrays(1, &skyboxVAO);
+    glGenBuffers(1, &skyboxVBO);
+    glBindVertexArray(skyboxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -126,8 +179,11 @@ int main()
         processInput(window);
 
 
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 view = camera.GetViewMatrix();
 
         calculate_day(currentFrame*50);
 
@@ -141,15 +197,12 @@ int main()
         church_shader.setFloat("material.shininess", 0.5f);
         church_shader.setFloat("light.power", sun_prop.light_power);
 
-        // view/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = camera.GetViewMatrix();
         church_shader.setMat4("projection", projection);
         church_shader.setMat4("view", view);
 
         // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
+        model = glm::translate(model, glm::vec3(0.0f)); // translate it down so it's at the center of the scene
         model = glm::rotate(model,glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         model = glm::rotate(model, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         model = glm::scale(model, glm::vec3(0.2f));	// it's a bit too big for our scene, so scale it down
@@ -171,9 +224,26 @@ int main()
         sun_shader.setMat4("model", model);
         sun_model.Draw(sun_shader);
 
+        glDepthMask(GL_FALSE);
+        glDepthFunc(GL_LEQUAL);
+        skybox_shader.use();
+
+        skybox_shader.setMat4("view", glm::mat4(glm::mat3(view)));
+        skybox_shader.setMat4("projection", projection);
+
+        glBindVertexArray(skyboxVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LESS);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    glDeleteVertexArrays(1, &skyboxVAO);
+    glDeleteBuffers(1, &skyboxVAO);
 
     glfwTerminate();
     return 0;
@@ -233,4 +303,30 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 void calculate_day(float angle){
     sun_prop.calc_day_properties(angle);
+}
+
+unsigned int load_cubemap(vector<std::string> faces)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++){
+        unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data){
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        }
+        else{
+            std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
+        }
+        stbi_image_free(data);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); //GL_CLAMP_TO_EDGE obaveno
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return textureID;
 }
