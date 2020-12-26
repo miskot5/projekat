@@ -10,6 +10,7 @@
 #include <learnopengl/shader_m.h>
 #include <learnopengl/model.h>
 #include <learnopengl/camera.h>
+#include <rg/DayProp.h>
 
 #include <iostream>
 
@@ -17,6 +18,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+void calculate_day(float angle);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -52,9 +54,14 @@ struct DirLight {
     glm::vec3 specular;
 };
 
-struct DayTime{
-    float day_angle; //angle of sun position
-};
+/*struct DayTime{
+    float angle; //angle of sun position
+    float radians;
+    float light_power;
+    glm::vec3 position;
+    glm::vec3 color;
+};*/
+DayProp sun_prop;
 
 int main()
 {
@@ -102,14 +109,9 @@ int main()
     Model sun_model(FileSystem::getPath("resources/objects/planet/planet.obj"));
     sun_model.SetShaderTextureNamePrefix("material.");
 
-    DayTime sun_daytime;
-    sun_daytime.day_angle = 90.0f;
-
-
     DirLight sun_light;
     sun_light.direction = glm::vec3(4.0f, 40.f, 0.0f);
     sun_light.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
-    //sun_light.diffuse = glm::vec3(0.6f, 0.5f, 0.6f);
     sun_light.diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
     sun_light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
@@ -127,23 +129,17 @@ int main()
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        sun_daytime.day_angle = currentFrame * 70;
-        float sun_time_angle = sun_daytime.day_angle;
-        float sun_time_radians = glm::radians(sun_time_angle);
-        float sun_time_power = max(sin(sun_time_radians), 0.0f);
-        glm::vec3 sun_time_position =
-                glm::vec3(5.0f, sin(sun_time_radians)*10.0f - 2.0f, -cos(sun_time_radians)*12.0f);
+        calculate_day(currentFrame*50);
 
         church_shader.use();
 
-        sun_light.direction = sun_time_position;
-        church_shader.setVec3("light.direction", sun_light.direction);
+        church_shader.setVec3("light.direction", sun_prop.position);
         church_shader.setVec3("viewPosition", camera.Position);
         church_shader.setVec3("light.ambient", sun_light.ambient);
         church_shader.setVec3("light.diffuse", sun_light.diffuse);
-        church_shader.setVec3("light.specular", sun_light.specular);
-        church_shader.setFloat("material.shininess", 1.0f);
-        church_shader.setFloat("light.power", sun_time_power);
+        church_shader.setVec3("light.specular", sun_prop.specular);
+        church_shader.setFloat("material.shininess", 0.5f);
+        church_shader.setFloat("light.power", sun_prop.light_power);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -167,10 +163,10 @@ int main()
         view = camera.GetViewMatrix();
         sun_shader.setMat4("projection", projection);
         sun_shader.setMat4("view", view);
-        sun_shader.setVec3("sun_color", glm::vec3(max(sun_time_power*0.5+0.5, 1.0), sun_time_power*0.85+0.15, sun_time_power*0.3)*sun_time_power);
+        sun_shader.setVec3("sun_color", sun_prop.color);
 
         model = glm::mat4(1.0f);
-        model = glm::translate(model, sun_time_position);
+        model = glm::translate(model, sun_prop.position);
         model = glm::scale(model, glm::vec3(0.05f));	// it's a bit too big for our scene, so scale it down
         sun_shader.setMat4("model", model);
         sun_model.Draw(sun_shader);
@@ -233,4 +229,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.ProcessMouseScroll(yoffset);
+}
+
+void calculate_day(float angle){
+    sun_prop.calc_day_properties(angle);
 }

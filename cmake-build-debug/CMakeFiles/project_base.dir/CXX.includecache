@@ -110,6 +110,10 @@ iostream
 common.h
 -
 
+../include/rg/DayProp.h
+glm/glm.hpp
+-
+
 ../include/stb_image.h
 stb_image.h
 ../include/stb_image.h
@@ -172,6 +176,8 @@ learnopengl/shader_m.h
 learnopengl/model.h
 -
 learnopengl/camera.h
+-
+rg/DayProp.h
 -
 iostream
 -

@@ -236,6 +236,9 @@
 				</MakeCommands>
 			</Target>
 		</Build>
+		<Unit filename="/home/jovan/Desktop/grafika/projekat/include/rg/DayProp.h">
+			<Option target="project_base"/>
+		</Unit>
 		<Unit filename="/home/jovan/Desktop/grafika/projekat/libs/glad/include/glad/glad.h">
 			<Option target="glad"/>
 		</Unit>
