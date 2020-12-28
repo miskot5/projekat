@@ -25,6 +25,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 unsigned int load_cubemap(vector<std::string> faces);
 void calculate_day(float angle);
+void calculate_night(float angle);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 // settings
@@ -49,7 +50,7 @@ struct DirLight {
 };
 
 DayProp sun_prop;
-
+DayProp moon_prop;
 
 struct ProgramState{
     bool ImGuiEnabled=false;
@@ -141,12 +142,18 @@ int main()
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     if(programState->ImGuiEnabled)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
     Shader church_shader("church_vertex.vs", "church_fragment.fs");
     Model church_model(FileSystem::getPath("resources/objects/church/aberkios_100k_texture.obj"));
 
     Shader sun_shader("sun_vertex.vs", "sun_fragment.fs");
     Model sun_model(FileSystem::getPath("resources/objects/planet/planet.obj"));
+
+    Shader moon_shader("moon_vertex.vs", "moon_fragment.fs");
+    Model moon_model(FileSystem::getPath("resources/objects/moon/planet.obj"));
+
     sun_model.SetShaderTextureNamePrefix("material.");
+    moon_model.SetShaderTextureNamePrefix("material.");
 
     Shader skybox_shader("skybox_vertex.vs", "skybox_fragment.fs");
 
@@ -216,6 +223,12 @@ int main()
     sun_light.diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
     sun_light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
+    DirLight moon_light;
+    moon_light.direction = glm::vec3(4.0f, 40.f, 0.0f);
+    moon_light.ambient = glm::vec3(0.1f, 0.1f, 0.3f);
+    moon_light.diffuse = glm::vec3(0.0f);
+    moon_light.specular = glm::vec3(0.03f, 0.03f, 0.1f);
+
     unsigned int skyboxVAO, skyboxVBO;
     glGenVertexArrays(1, &skyboxVAO);
     glGenBuffers(1, &skyboxVBO);
@@ -235,7 +248,7 @@ int main()
 
         processInput(window);
 
-        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+        glClearColor(sun_prop.sky_color.x, sun_prop.sky_color.y, sun_prop.sky_color.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -243,19 +256,31 @@ int main()
 
         degrees+=1.00f;
             calculate_day(degrees * programState->SunSpeed);
+            calculate_night(degrees * programState->SunSpeed+180);
             if(programState->SunSpeedCheck)
             programState->SunSpeed = 0.1f;
 
 
         church_shader.use();
+        if(sun_prop.active) {
+            church_shader.setVec3("light.direction", sun_prop.position);
+            church_shader.setVec3("viewPosition", programState->camera.Position);
+            church_shader.setVec3("light.ambient", sun_light.ambient);
+            church_shader.setVec3("light.diffuse", sun_light.diffuse);
+            church_shader.setVec3("light.specular", sun_prop.specular);
+            church_shader.setFloat("material.shininess", 0.5f);
+            church_shader.setFloat("light.power", sun_prop.light_power);
+        }
 
-        church_shader.setVec3("light.direction", sun_prop.position);
-        church_shader.setVec3("viewPosition", programState->camera.Position);
-        church_shader.setVec3("light.ambient", sun_light.ambient);
-        church_shader.setVec3("light.diffuse", sun_light.diffuse);
-        church_shader.setVec3("light.specular", sun_prop.specular);
-        church_shader.setFloat("material.shininess", 0.5f);
-        church_shader.setFloat("light.power", sun_prop.light_power);
+        if(moon_prop.active) {
+            church_shader.setVec3("light.direction", moon_prop.position);
+            church_shader.setVec3("viewPosition", programState->camera.Position);
+            church_shader.setVec3("light.ambient", moon_light.ambient);
+            church_shader.setVec3("light.diffuse", moon_light.diffuse);
+            church_shader.setVec3("light.specular", moon_prop.specular);
+            church_shader.setFloat("material.shininess", 0.5f);
+            church_shader.setFloat("light.power", moon_prop.light_power);
+        }
 
         church_shader.setMat4("projection", projection);
         church_shader.setMat4("view", view);
@@ -270,33 +295,50 @@ int main()
 
         church_model.Draw(church_shader);
 
-        sun_shader.use();
+        if(sun_prop.active) {
+            sun_shader.use();
 
-        projection = glm::perspective(glm::radians(programState->camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        view = programState->camera.GetViewMatrix();
-        sun_shader.setMat4("projection", projection);
-        sun_shader.setMat4("view", view);
-        sun_shader.setVec3("sun_color", sun_prop.color);
+            sun_shader.setMat4("projection", projection);
+            sun_shader.setMat4("view", view);
+            sun_shader.setVec3("sun_color", sun_prop.color);
 
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, sun_prop.position);
-        model = glm::scale(model, glm::vec3(programState->SunScale));	// it's a bit too big for our scene, so scale it down
-        sun_shader.setMat4("model", model);
-        sun_model.Draw(sun_shader);
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, sun_prop.position);
+            model = glm::scale(model, glm::vec3(0.05f));    // it's a bit too big for our scene, so scale it down
+            sun_shader.setMat4("model", model);
+            sun_model.Draw(sun_shader);
+        }
 
-        glDepthMask(GL_FALSE);
-        glDepthFunc(GL_LEQUAL);
-        skybox_shader.use();
+        if(moon_prop.active) {
+            moon_shader.use();
 
-        skybox_shader.setMat4("view", glm::mat4(glm::mat3(view)));
-        skybox_shader.setMat4("projection", projection);
+            moon_shader.setMat4("projection", projection);
+            moon_shader.setMat4("view", view);
+            moon_shader.setVec3("moon_color", moon_prop.color);
 
-        glBindVertexArray(skyboxVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glDepthMask(GL_TRUE);
-        glDepthFunc(GL_LESS);
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, moon_prop.position);
+            model = glm::scale(model, glm::vec3(0.05f));    // it's a bit too big for our scene, so scale it down
+            moon_shader.setMat4("model", model);
+            moon_model.Draw(moon_shader);
+        }
+        if(!sun_prop.active){
+            glDepthMask(GL_FALSE);
+            glDepthFunc(GL_LEQUAL);
+            skybox_shader.use();
+
+            skybox_shader.setMat4("view", glm::mat4(glm::mat3(view)));
+            skybox_shader.setMat4("projection", projection);
+            skybox_shader.setFloat("power", moon_prop.light_power);
+
+            glBindVertexArray(skyboxVAO);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glDepthMask(GL_TRUE);
+            glDepthFunc(GL_LESS);
+        }
+
         if(programState->ImGuiEnabled)
             DrawImGui(programState);
 
@@ -375,6 +417,10 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 void calculate_day(float angle){
     sun_prop.calc_day_properties(angle);
+}
+
+void calculate_night(float angle){
+    moon_prop.calc_night_properties(angle);
 }
 
 unsigned int load_cubemap(vector<std::string> faces)
