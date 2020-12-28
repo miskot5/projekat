@@ -1,3 +1,8 @@
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stb_image.h>
@@ -20,14 +25,13 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 unsigned int load_cubemap(vector<std::string> faces);
 void calculate_day(float angle);
-
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 // camera
-Camera camera(glm::vec3(0.0f, 1.0f, 10.0f));
 float lastX = SCR_WIDTH / 2.0f ;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -46,6 +50,46 @@ struct DirLight {
 
 DayProp sun_prop;
 
+
+struct ProgramState{
+    bool ImGuiEnabled=false;
+    float SunScale=0.05f;
+    float SunSpeed=0.1f;
+    bool SunSpeedCheck=false;
+    void LoadFromDisk(string path);
+    void SaveToDisk(string path);
+
+    Camera camera;
+
+    ProgramState()
+    : camera(glm::vec3(0.0f, 1.0f, 10.0f)){}
+};
+
+void ProgramState::LoadFromDisk(string path){
+    ifstream in(path);
+    in>>ImGuiEnabled
+    >>SunSpeed
+    >>camera.Position.x
+    >>camera.Position.y
+    >>camera.Position.z
+    >>camera.Pitch
+    >>camera.Yaw;
+}
+
+void ProgramState::SaveToDisk(string path){
+    ofstream out(path);
+    out<<ImGuiEnabled<<'\n'
+    <<SunSpeed<<'\n'
+    <<camera.Position.x<<'\n'
+    <<camera.Position.y<<'\n'
+    <<camera.Position.z<<'\n'
+    <<camera.Pitch<<'\n'
+    <<camera.Yaw<<'\n';
+}
+
+
+ProgramState* programState;
+void DrawImGui(ProgramState* programState);
 int main()
 {
     // glfw: initialize and configure
@@ -72,9 +116,7 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-
-    // tell GLFW to capture our mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetKeyCallback(window,key_callback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -82,8 +124,23 @@ int main()
         return -1;
     }
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io=ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplGlfw_InitForOpenGL(window,true);
+    ImGui_ImplOpenGL3_Init("#version 330 core");
+
+
     glEnable(GL_DEPTH_TEST);
 
+    programState=new ProgramState();
+
+    programState->LoadFromDisk("resources/programState.txt");
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    if(programState->ImGuiEnabled)
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     Shader church_shader("church_vertex.vs", "church_fragment.fs");
     Model church_model(FileSystem::getPath("resources/objects/church/aberkios_100k_texture.obj"));
 
@@ -168,9 +225,9 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
+    float degrees=0.00f;
     while (!glfwWindowShouldClose(window))
     {
-
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
@@ -178,19 +235,22 @@ int main()
 
         processInput(window);
 
-
         glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 view = programState->camera.GetViewMatrix();
 
-        calculate_day(currentFrame*50);
+        degrees+=1.00f;
+            calculate_day(degrees * programState->SunSpeed);
+            if(programState->SunSpeedCheck)
+            programState->SunSpeed = 0.1f;
+
 
         church_shader.use();
 
         church_shader.setVec3("light.direction", sun_prop.position);
-        church_shader.setVec3("viewPosition", camera.Position);
+        church_shader.setVec3("viewPosition", programState->camera.Position);
         church_shader.setVec3("light.ambient", sun_light.ambient);
         church_shader.setVec3("light.diffuse", sun_light.diffuse);
         church_shader.setVec3("light.specular", sun_prop.specular);
@@ -212,15 +272,15 @@ int main()
 
         sun_shader.use();
 
-        projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        view = camera.GetViewMatrix();
+        projection = glm::perspective(glm::radians(programState->camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        view = programState->camera.GetViewMatrix();
         sun_shader.setMat4("projection", projection);
         sun_shader.setMat4("view", view);
         sun_shader.setVec3("sun_color", sun_prop.color);
 
         model = glm::mat4(1.0f);
         model = glm::translate(model, sun_prop.position);
-        model = glm::scale(model, glm::vec3(0.05f));	// it's a bit too big for our scene, so scale it down
+        model = glm::scale(model, glm::vec3(programState->SunScale));	// it's a bit too big for our scene, so scale it down
         sun_shader.setMat4("model", model);
         sun_model.Draw(sun_shader);
 
@@ -237,10 +297,21 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glDepthMask(GL_TRUE);
         glDepthFunc(GL_LESS);
+        if(programState->ImGuiEnabled)
+            DrawImGui(programState);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    programState->SaveToDisk("resources/programState.txt");
+
+    //ImGui cleanup
+    ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui::DestroyContext();
+
+    delete programState;
 
     glDeleteVertexArrays(1, &skyboxVAO);
     glDeleteBuffers(1, &skyboxVAO);
@@ -257,13 +328,13 @@ void processInput(GLFWwindow *window)
         glfwSetWindowShouldClose(window, true);
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
+        programState->camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
+        programState->camera.ProcessKeyboard(BACKWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
+        programState->camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
+        programState->camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -292,13 +363,14 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     lastX = xpos;
     lastY = ypos;
 
-    camera.ProcessMouseMovement(xoffset, yoffset);
+    if(programState->ImGuiEnabled==false)
+        programState->camera.ProcessMouseMovement(xoffset, yoffset);
 }
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    camera.ProcessMouseScroll(yoffset);
+    programState->camera.ProcessMouseScroll(yoffset);
 }
 
 void calculate_day(float angle){
@@ -329,4 +401,41 @@ unsigned int load_cubemap(vector<std::string> faces)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     return textureID;
+}
+
+void DrawImGui(ProgramState* programState){
+    //ImGui frame
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    {
+        ImGui::Begin("Sun properties");
+        ImGui::DragFloat("Sun scale",&programState->SunScale,0.01f,0.05f,0.3f);
+        ImGui::DragFloat("SunSpeed",&programState->SunSpeed,0.001f,0.1f,10.0f);
+        ImGui::Checkbox("Default speed",&programState->SunSpeedCheck);
+        ImGui::End();
+    }
+
+    {
+        ImGui::Begin("Camera info");
+        ImGui::Text("Camera position: (%f, %f, %f)",programState->camera.Position.x,programState->camera.Position.y,programState->camera.Position.z);
+        ImGui::End();
+    }
+
+    //ImGui render
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
+    if(key==GLFW_KEY_Q && action==GLFW_PRESS){
+        programState->ImGuiEnabled=!programState->ImGuiEnabled;
+        if(programState->ImGuiEnabled){
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+        else{
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+    }
 }

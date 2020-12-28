@@ -12,6 +12,10 @@ CMakeFiles/project_base.dir/src/main.cpp.o: ../include/rg/DayProp.h
 CMakeFiles/project_base.dir/src/main.cpp.o: ../include/stb_image.h
 CMakeFiles/project_base.dir/src/main.cpp.o: ../libs/glad/include/KHR/khrplatform.h
 CMakeFiles/project_base.dir/src/main.cpp.o: ../libs/glad/include/glad/glad.h
+CMakeFiles/project_base.dir/src/main.cpp.o: ../libs/imgui/include/imconfig.h
+CMakeFiles/project_base.dir/src/main.cpp.o: ../libs/imgui/include/imgui.h
+CMakeFiles/project_base.dir/src/main.cpp.o: ../libs/imgui/include/imgui_impl_glfw.h
+CMakeFiles/project_base.dir/src/main.cpp.o: ../libs/imgui/include/imgui_impl_opengl3.h
 CMakeFiles/project_base.dir/src/main.cpp.o: ../src/main.cpp
 CMakeFiles/project_base.dir/src/main.cpp.o: configuration/root_directory.h
 
