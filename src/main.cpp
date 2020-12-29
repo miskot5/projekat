@@ -27,6 +27,7 @@ unsigned int load_cubemap(vector<std::string> faces);
 void calculate_day(float angle);
 void calculate_night(float angle);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void skybox_rotate(Camera& camera_box, float xoffset, float yoffset);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -36,6 +37,9 @@ const unsigned int SCR_HEIGHT = 600;
 float lastX = SCR_WIDTH / 2.0f ;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
+bool firstMouse_box = true;
+float lastX_box = SCR_WIDTH / 2.0f ;
+float lastY_box = SCR_HEIGHT / 2.0f;
 
 // timing
 float deltaTime = 0.0f;
@@ -55,7 +59,7 @@ DayProp moon_prop;
 struct ProgramState{
     bool ImGuiEnabled=false;
     float SunScale=0.05f;
-    float SunSpeed=0.1f;
+    float SunSpeed=1.0f;
     bool SunSpeedCheck=false;
     void LoadFromDisk(string path);
     void SaveToDisk(string path);
@@ -63,7 +67,7 @@ struct ProgramState{
     Camera camera;
 
     ProgramState()
-    : camera(glm::vec3(0.0f, 1.0f, 10.0f)){}
+            : camera(glm::vec3(0.0f, 1.0f, 10.0f)){}
 };
 
 void ProgramState::LoadFromDisk(string path){
@@ -91,6 +95,10 @@ void ProgramState::SaveToDisk(string path){
 
 ProgramState* programState;
 void DrawImGui(ProgramState* programState);
+
+Camera camera_box;
+float moon_rotate=0.0f;
+
 int main()
 {
     // glfw: initialize and configure
@@ -219,15 +227,15 @@ int main()
 
     DirLight sun_light;
     sun_light.direction = glm::vec3(4.0f, 40.f, 0.0f);
-    sun_light.ambient = glm::vec3(0.2f, 0.2f, 0.2f);
+    sun_light.ambient = glm::vec3(0.5f);
     sun_light.diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
     sun_light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
 
     DirLight moon_light;
     moon_light.direction = glm::vec3(4.0f, 40.f, 0.0f);
-    moon_light.ambient = glm::vec3(0.1f, 0.1f, 0.3f);
-    moon_light.diffuse = glm::vec3(0.0f);
-    moon_light.specular = glm::vec3(0.03f, 0.03f, 0.1f);
+    moon_light.ambient = glm::vec3(0.1f, 0.1f, 0.15f);
+    moon_light.diffuse = glm::vec3(0.02f, 0.02f, 0.1f);
+    moon_light.specular = glm::vec3(0.05f, 0.05f, 0.3f);
 
     unsigned int skyboxVAO, skyboxVBO;
     glGenVertexArrays(1, &skyboxVAO);
@@ -239,6 +247,7 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
     float degrees=0.00f;
+    camera_box = programState->camera;
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = glfwGetTime();
@@ -254,12 +263,13 @@ int main()
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
 
-        degrees+=1.00f;
-            calculate_day(degrees * programState->SunSpeed);
-            calculate_night(degrees * programState->SunSpeed+180);
-            if(programState->SunSpeedCheck)
-            programState->SunSpeed = 0.1f;
+        degrees+=0.5f * programState->SunSpeed;
+        moon_rotate =abs(degrees - 0.5f*programState->SunSpeed);
 
+        calculate_day(degrees);
+        calculate_night(degrees+180);
+        if(programState->SunSpeedCheck)
+            programState->SunSpeed = 1.0f;
 
         church_shader.use();
         if(sun_prop.active) {
@@ -278,7 +288,7 @@ int main()
             church_shader.setVec3("light.ambient", moon_light.ambient);
             church_shader.setVec3("light.diffuse", moon_light.diffuse);
             church_shader.setVec3("light.specular", moon_prop.specular);
-            church_shader.setFloat("material.shininess", 0.5f);
+            church_shader.setFloat("material.shininess", 0.1f);
             church_shader.setFloat("light.power", moon_prop.light_power);
         }
 
@@ -304,7 +314,7 @@ int main()
 
             model = glm::mat4(1.0f);
             model = glm::translate(model, sun_prop.position);
-            model = glm::scale(model, glm::vec3(0.05f));    // it's a bit too big for our scene, so scale it down
+            model = glm::scale(model, glm::vec3(0.15f));    // it's a bit too big for our scene, so scale it down
             sun_shader.setMat4("model", model);
             sun_model.Draw(sun_shader);
         }
@@ -318,16 +328,21 @@ int main()
 
             model = glm::mat4(1.0f);
             model = glm::translate(model, moon_prop.position);
-            model = glm::scale(model, glm::vec3(0.05f));    // it's a bit too big for our scene, so scale it down
+            model = glm::rotate(model, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::rotate(model, moon_rotate/20.0f, glm::vec3(-1.0f, -1.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.15f));    // it's a bit too big for our scene, so scale it down
             moon_shader.setMat4("model", model);
             moon_model.Draw(moon_shader);
         }
-        if(!sun_prop.active){
+        if(!sun_prop.active) {
             glDepthMask(GL_FALSE);
             glDepthFunc(GL_LEQUAL);
             skybox_shader.use();
 
-            skybox_shader.setMat4("view", glm::mat4(glm::mat3(view)));
+            skybox_rotate(camera_box, programState->camera.Position.x, programState->camera.Position.y);
+            glm::mat4 view_box = camera_box.GetViewMatrix();
+
+            skybox_shader.setMat4("view", glm::mat4(glm::mat3(view_box)));
             skybox_shader.setMat4("projection", projection);
             skybox_shader.setFloat("power", moon_prop.light_power);
 
@@ -407,6 +422,10 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 
     if(programState->ImGuiEnabled==false)
         programState->camera.ProcessMouseMovement(xoffset, yoffset);
+
+
+    camera_box.ProcessMouseMovement(xoffset, yoffset, true);
+
 }
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
@@ -458,7 +477,7 @@ void DrawImGui(ProgramState* programState){
     {
         ImGui::Begin("Sun properties");
         ImGui::DragFloat("Sun scale",&programState->SunScale,0.01f,0.05f,0.3f);
-        ImGui::DragFloat("SunSpeed",&programState->SunSpeed,0.001f,0.1f,10.0f);
+        ImGui::DragFloat("SunSpeed",&programState->SunSpeed,0.1f,0.0f,2.0f);
         ImGui::Checkbox("Default speed",&programState->SunSpeedCheck);
         ImGui::End();
     }
@@ -485,3 +504,28 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
     }
 }
+
+void skybox_rotate(Camera& camera_box, float xpos, float ypos){
+
+    if(!sun_prop.active) {
+        if (firstMouse_box) {
+            lastX_box = xpos;
+            lastY_box = ypos;
+            firstMouse_box = false;
+        }
+    }
+    else
+        firstMouse_box=true;
+
+
+    float xoffset = xpos - lastX_box ;
+    float yoffset = lastY_box - ypos ; // reversed since y-coordinates go from bottom to top
+
+    lastX_box = xpos;
+    lastY_box = ypos;
+
+    float speed = programState->SunSpeed + 0.3f;
+    camera_box.ProcessMouseMovement(xoffset + speed*0.8f , yoffset, true);
+}
+
+

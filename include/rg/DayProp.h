@@ -29,9 +29,9 @@ public:
         position = glm::vec3(5.0f, sin(radians) * 10.0f - 2.0f, -cos(radians) * 12.0f);
         color = glm::vec3(light_power * 0.2 + 0.8, light_power * 0.85 + 0.15, light_power * 0.3) *
                 light_power;
-        specular = color;
+        specular = glm::vec3(light_power * 0.2 + 0.8, light_power * 0.85 + 0.15, light_power * 0.3);
         if(active)
-            sky_color = glm::vec3(min(light_power, 0.5f), min(light_power, 0.5f), light_power);
+            sky_color = glm::vec3(min(light_power  + 0.3f, 0.5f), min(light_power, 0.5f), light_power) * light_power;
         else
             sky_color = glm::vec3(0.0f);
     }
@@ -44,9 +44,8 @@ public:
             active = false;
         else
             active = true;
-        position = glm::vec3(5.0f, sin(radians) * 10.0f - 2.0f, -cos(radians) * 12.0f);
-        color = glm::vec3(light_power * 0.2 + 0.8, light_power * 0.85 + 0.15, light_power * 0.3) *
-                light_power;
+        position = glm::vec3(5.0f, sin(radians) * 7.0f - 1.0f, -cos(radians) * 8.0f);
+        color = glm::vec3(light_power*0.8, light_power*0.8, light_power) * light_power;
         specular = color;
         sky_color=glm::vec3(0.0f);
     }
