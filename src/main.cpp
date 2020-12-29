@@ -27,7 +27,11 @@ unsigned int load_cubemap(vector<std::string> faces);
 void calculate_day(float angle);
 void calculate_night(float angle);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+<<<<<<< HEAD
 void skybox_rotate(Camera& camera_box, float xoffset, float yoffset);
+=======
+unsigned int loadTexture(const char *path);
+>>>>>>> 14c12b9ea03e83d09a974e59fdd5eab55d39ab4c
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -328,8 +332,13 @@ int main()
 
             model = glm::mat4(1.0f);
             model = glm::translate(model, moon_prop.position);
+<<<<<<< HEAD
             model = glm::rotate(model, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             model = glm::rotate(model, moon_rotate/20.0f, glm::vec3(-1.0f, -1.0f, 0.0f));
+=======
+            model = glm::rotate(model,glm::radians(180.0f),glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::rotate(model,currentFrame/1.5f,glm::vec3(-1.0f, -1.0f, 0.0f));
+>>>>>>> 14c12b9ea03e83d09a974e59fdd5eab55d39ab4c
             model = glm::scale(model, glm::vec3(0.15f));    // it's a bit too big for our scene, so scale it down
             moon_shader.setMat4("model", model);
             moon_model.Draw(moon_shader);
@@ -369,6 +378,7 @@ int main()
     ImGui::DestroyContext();
 
     delete programState;
+
 
     glDeleteVertexArrays(1, &skyboxVAO);
     glDeleteBuffers(1, &skyboxVAO);
@@ -505,6 +515,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
 }
 
+<<<<<<< HEAD
 void skybox_rotate(Camera& camera_box, float xpos, float ypos){
 
     if(!sun_prop.active) {
@@ -529,3 +540,41 @@ void skybox_rotate(Camera& camera_box, float xpos, float ypos){
 }
 
 
+=======
+unsigned int loadTexture(char const * path)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    int width, height, nrComponents;
+    unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
+    if (data)
+    {
+        GLenum format;
+        if (nrComponents == 1)
+            format = GL_RED;
+        else if (nrComponents == 3)
+            format = GL_RGB;
+        else if (nrComponents == 4)
+            format = GL_RGBA;
+
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT); // for this tutorial: use GL_CLAMP_TO_EDGE to prevent semi-transparent borders. Due to interpolation it takes texels from next repeat
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        stbi_image_free(data);
+    }
+    else
+    {
+        std::cout << "Texture failed to load at path: " << path << std::endl;
+        stbi_image_free(data);
+    }
+
+    return textureID;
+}
+>>>>>>> 14c12b9ea03e83d09a974e59fdd5eab55d39ab4c

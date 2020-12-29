@@ -45,7 +45,12 @@ public:
         else
             active = true;
         position = glm::vec3(5.0f, sin(radians) * 7.0f - 1.0f, -cos(radians) * 8.0f);
+<<<<<<< HEAD
         color = glm::vec3(light_power*0.8, light_power*0.8, light_power) * light_power;
+=======
+        color = glm::vec3(light_power * 0.8 , light_power * 0.8, light_power) *
+                light_power;
+>>>>>>> 14c12b9ea03e83d09a974e59fdd5eab55d39ab4c
         specular = color;
         sky_color=glm::vec3(0.0f);
     }
