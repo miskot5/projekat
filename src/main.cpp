@@ -27,11 +27,8 @@ unsigned int load_cubemap(vector<std::string> faces);
 void calculate_day(float angle);
 void calculate_night(float angle);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-<<<<<<< HEAD
 void skybox_rotate(Camera& camera_box, float xoffset, float yoffset);
-=======
 unsigned int loadTexture(const char *path);
->>>>>>> 14c12b9ea03e83d09a974e59fdd5eab55d39ab4c
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -332,13 +329,10 @@ int main()
 
             model = glm::mat4(1.0f);
             model = glm::translate(model, moon_prop.position);
-<<<<<<< HEAD
             model = glm::rotate(model, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             model = glm::rotate(model, moon_rotate/20.0f, glm::vec3(-1.0f, -1.0f, 0.0f));
-=======
             model = glm::rotate(model,glm::radians(180.0f),glm::vec3(0.0f, 1.0f, 0.0f));
             model = glm::rotate(model,currentFrame/1.5f,glm::vec3(-1.0f, -1.0f, 0.0f));
->>>>>>> 14c12b9ea03e83d09a974e59fdd5eab55d39ab4c
             model = glm::scale(model, glm::vec3(0.15f));    // it's a bit too big for our scene, so scale it down
             moon_shader.setMat4("model", model);
             moon_model.Draw(moon_shader);
@@ -515,7 +509,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
 }
 
-<<<<<<< HEAD
 void skybox_rotate(Camera& camera_box, float xpos, float ypos){
 
     if(!sun_prop.active) {
@@ -539,8 +532,6 @@ void skybox_rotate(Camera& camera_box, float xpos, float ypos){
     camera_box.ProcessMouseMovement(xoffset + speed*0.8f , yoffset, true);
 }
 
-
-=======
 unsigned int loadTexture(char const * path)
 {
     unsigned int textureID;
@@ -577,4 +568,3 @@ unsigned int loadTexture(char const * path)
 
     return textureID;
 }
->>>>>>> 14c12b9ea03e83d09a974e59fdd5eab55d39ab4c
