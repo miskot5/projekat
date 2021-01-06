@@ -59,7 +59,7 @@ struct PointLight{
     glm::vec3 diffuse;
     glm::vec3 specular;
 
-    float power=0.0f;
+    float power;
     float constant;
     float linear;
     float quadratic;
@@ -175,8 +175,9 @@ int main()
     sun_model.SetShaderTextureNamePrefix("material.");
     moon_model.SetShaderTextureNamePrefix("material.");
 
-    Shader gras_shader("grass_vertex.vs","grass_fragment.fs");
     Shader skybox_shader("skybox_vertex.vs", "skybox_fragment.fs");
+
+    Shader grass_shader("grass_vertex.vs", "grass_fragment.fs");
 
     float vertices[] = {
             // positions          // texture coords
@@ -209,36 +210,31 @@ int main()
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
+    float planeVertices[] = {
+            // positions          // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+            5.0f, -0.5f,  5.0f,  1.0f, 0.0f,
+            -5.0f, -0.5f,  5.0f,  0.0f, 0.0f,
+            -5.0f, -0.5f, -5.0f,  0.0f, 1.0f,
 
-    // load and create a texture
-    // -------------------------
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
-    // set the texture wrapping parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // set texture filtering parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load image, create texture and generate mipmaps
-    int width, height, nrChannels;
-    // The FileSystem::getPath(...) is part of the GitHub repository so we can find files on any IDE/platform; replace it with your own image path.
-    unsigned char *data = stbi_load(FileSystem::getPath("resources/textures/grass.png").c_str(), &width, &height, &nrChannels, 0);
-    if (data)
-    {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else
-    {
-        std::cout << "Failed to load texture" << std::endl;
-    }
-    stbi_image_free(data);
-    /*
-       gras_shader.use();
-       gras_shader.setInt("texture1",0);
-       */
+            5.0f, -0.5f,  5.0f,  1.0f, 0.0f,
+            -5.0f, -0.5f, -5.0f,  0.0f, 1.0f,
+            5.0f, -0.5f, -5.0f,  1.0f, 1.0f
+    };
+
+    unsigned int planeVAO, planeVBO;
+    glGenVertexArrays(1, &planeVAO);
+    glGenBuffers(1, &planeVBO);
+    glBindVertexArray(planeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glBindVertexArray(0);
+
+    unsigned int floorTexture = loadTexture(FileSystem::getPath("resources/textures/grass_circle.png").c_str());
+
     float skyboxVertices[] = {
             // positions
             -1.0f,  1.0f, -1.0f,
@@ -313,12 +309,13 @@ int main()
 
     PointLight pointLight;
     pointLight.position=glm::vec3 (0.5,0.7,0.5);
-    pointLight.ambient=glm::vec3(0.6f,0.6f,0.6f);
-    pointLight.diffuse=glm::vec3(0.6f,0.6f,0.6f);
-    pointLight.specular=glm::vec3(1.0f,1.0f,1.0f);
-    pointLight.constant=1.0f;
-    pointLight.linear=0.09f;
-    pointLight.quadratic=0.42f;
+    pointLight.ambient=glm::vec3(0.2f,0.2f,0.2f);
+    pointLight.diffuse=glm::vec3(0.2f,0.2f,0.0f);
+    pointLight.specular=glm::vec3(1.0f,1.0f,0.0f);
+    pointLight.power=0.0f;
+    pointLight.constant=0.5f;
+    pointLight.linear=0.01f;
+    pointLight.quadratic=0.2f;
 
     unsigned int skyboxVAO, skyboxVBO;
     glGenVertexArrays(1, &skyboxVAO);
@@ -344,10 +341,6 @@ int main()
         glClearColor(sun_prop.sky_color.x, sun_prop.sky_color.y, sun_prop.sky_color.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
-
-
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
 
@@ -360,6 +353,7 @@ int main()
             programState->SunSpeed = 1.0f;
 
         church_shader.use();
+
         if(sun_prop.active) {
             church_shader.setVec3("light.direction", sun_prop.position);
             church_shader.setVec3("viewPosition", programState->camera.Position);
@@ -378,14 +372,15 @@ int main()
             church_shader.setVec3("light.specular", moon_prop.specular);
             church_shader.setFloat("material.shininess", 0.1f);
             church_shader.setFloat("light.power", moon_prop.light_power);
-            church_shader.setVec3("pointLight.position",pointLight.position);
-            church_shader.setVec3("pointLight.diffuse",pointLight.diffuse);
-            //church_shader.setFloat("pointLight.power",pointLight.power);
-            church_shader.setVec3("pointLight.specular",pointLight.specular);
-            church_shader.setFloat("pointLight.constant", pointLight.constant);
-            church_shader.setFloat("pointLight.linear",pointLight.linear);
-            church_shader.setFloat("pointLight.quadratic",pointLight.quadratic);
         }
+
+        church_shader.setVec3("pointLight.position",pointLight.position);
+        church_shader.setVec3("pointLight.diffuse",pointLight.diffuse);
+        church_shader.setFloat("pointLight.power",moon_prop.light_power);
+        church_shader.setVec3("pointLight.specular",pointLight.specular);
+        church_shader.setFloat("pointLight.constant", pointLight.constant);
+        church_shader.setFloat("pointLight.linear",pointLight.linear);
+        church_shader.setFloat("pointLight.quadratic",pointLight.quadratic * (sin(moon_rotate*0.5)/4+0.5));
 
         church_shader.setMat4("projection", projection);
         church_shader.setMat4("view", view);
@@ -409,7 +404,7 @@ int main()
 
             model = glm::mat4(1.0f);
             model = glm::translate(model, sun_prop.position);
-            model = glm::scale(model, glm::vec3(0.1f));    // it's a bit too big for our scene, so scale it down
+            model = glm::scale(model, glm::vec3(0.13f));    // it's a bit too big for our scene, so scale it down
             sun_shader.setMat4("model", model);
             sun_model.Draw(sun_shader);
         }
@@ -425,25 +420,26 @@ int main()
             model = glm::translate(model, moon_prop.position);
             model = glm::rotate(model, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             model = glm::rotate(model, moon_rotate/20.0f, glm::vec3(-1.0f, -1.0f, 0.0f));
-            model = glm::rotate(model,glm::radians(180.0f),glm::vec3(0.0f, 1.0f, 0.0f));
-            model = glm::rotate(model,currentFrame/1.5f,glm::vec3(-1.0f, -1.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(0.15f));    // it's a bit too big for our scene, so scale it down
+            model = glm::scale(model, glm::vec3(0.18f));    // it's a bit too big for our scene, so scale it down
             moon_shader.setMat4("model", model);
             moon_model.Draw(moon_shader);
 
         }
 
-        gras_shader.use();
-        glm::mat4 model1=glm::mat4(1.0f);
-        model1=glm::translate(model1,glm::vec3(0.0,-0.75,0.0));
-        model1=glm::rotate(model1, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        model1=glm::scale(model1,glm::vec3(100.5f,15.3f,50.5f));
-        gras_shader.setMat4("model",model1);
-        gras_shader.setMat4("view",view);
-        gras_shader.setMat4("projection",projection);
-
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        grass_shader.use();
+        // floor
+        glBindVertexArray(planeVAO);
+        glBindTexture(GL_TEXTURE_2D, floorTexture);
+        model = glm::mat4(1.0f);
+        model = glm::scale(model, glm::vec3(2.6f));
+        grass_shader.setMat4("model", model);
+        grass_shader.setMat4("projection", projection);
+        grass_shader.setMat4("view", view);
+        if(sun_prop.active)
+            grass_shader.setFloat("power", sun_prop.light_power * 0.65f);
+        else
+            grass_shader.setFloat("power", moon_prop.light_power * 0.1f);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         if(!sun_prop.active) {
             glDepthMask(GL_FALSE);
@@ -538,7 +534,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
         programState->camera.ProcessMouseMovement(xoffset, yoffset);
 
 
-    camera_box.ProcessMouseMovement(xoffset, yoffset, true);
+    camera_box.ProcessMouseMovement(xoffset, yoffset, false);
 
 }
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
@@ -638,8 +634,8 @@ void skybox_rotate(Camera& camera_box, float xpos, float ypos){
     lastX_box = xpos;
     lastY_box = ypos;
 
-    float speed = programState->SunSpeed + 0.3f;
-    camera_box.ProcessMouseMovement(xoffset + speed*0.8f , yoffset, true);
+    float speed = programState->SunSpeed;
+    camera_box.ProcessMouseMovement(xoffset + speed*0.6f , yoffset, true);
 }
 
 unsigned int loadTexture(char const * path)
@@ -663,8 +659,8 @@ unsigned int loadTexture(char const * path)
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT); // for this tutorial: use GL_CLAMP_TO_EDGE to prevent semi-transparent borders. Due to interpolation it takes texels from next repeat
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // for this tutorial: use GL_CLAMP_TO_EDGE to prevent semi-transparent borders. Due to interpolation it takes texels from next repeat
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
