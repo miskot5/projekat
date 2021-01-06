@@ -48,10 +48,21 @@ float lastFrame = 0.0f;
 
 struct DirLight {
     glm::vec3 direction;
-
     glm::vec3 ambient;
     glm::vec3 diffuse;
     glm::vec3 specular;
+};
+
+struct PointLight{
+    glm::vec3 position;
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
+
+    float power=0.0f;
+    float constant;
+    float linear;
+    float quadratic;
 };
 
 DayProp sun_prop;
@@ -93,7 +104,6 @@ void ProgramState::SaveToDisk(string path){
     <<camera.Yaw<<'\n';
 }
 
-
 ProgramState* programState;
 void DrawImGui(ProgramState* programState);
 
@@ -134,6 +144,7 @@ int main()
         return -1;
     }
 
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io=ImGui::GetIO(); (void)io;
@@ -164,8 +175,70 @@ int main()
     sun_model.SetShaderTextureNamePrefix("material.");
     moon_model.SetShaderTextureNamePrefix("material.");
 
+    Shader gras_shader("grass_vertex.vs","grass_fragment.fs");
     Shader skybox_shader("skybox_vertex.vs", "skybox_fragment.fs");
 
+    float vertices[] = {
+            // positions          // texture coords
+            0.5f,  0.5f, 0.0f,   1.0f, 1.0f, // top right
+            0.5f, -0.5f, 0.0f,   1.0f, 0.0f, // bottom right
+            -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, // bottom left
+            -0.5f,  0.5f, 0.0f,   0.0f, 1.0f  // top left
+    };
+    unsigned int indices[] = {
+            0, 1, 3, // first triangle
+            1, 2, 3  // second triangle
+    };
+    unsigned int VBO, VAO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+
+    glBindVertexArray(VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    // position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // texture coord attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+
+    // load and create a texture
+    // -------------------------
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+    // set the texture wrapping parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // load image, create texture and generate mipmaps
+    int width, height, nrChannels;
+    // The FileSystem::getPath(...) is part of the GitHub repository so we can find files on any IDE/platform; replace it with your own image path.
+    unsigned char *data = stbi_load(FileSystem::getPath("resources/textures/grass.png").c_str(), &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(data);
+    /*
+       gras_shader.use();
+       gras_shader.setInt("texture1",0);
+       */
     float skyboxVertices[] = {
             // positions
             -1.0f,  1.0f, -1.0f,
@@ -238,6 +311,15 @@ int main()
     moon_light.diffuse = glm::vec3(0.02f, 0.02f, 0.1f);
     moon_light.specular = glm::vec3(0.05f, 0.05f, 0.3f);
 
+    PointLight pointLight;
+    pointLight.position=glm::vec3 (0.5,0.7,0.5);
+    pointLight.ambient=glm::vec3(0.6f,0.6f,0.6f);
+    pointLight.diffuse=glm::vec3(0.6f,0.6f,0.6f);
+    pointLight.specular=glm::vec3(1.0f,1.0f,1.0f);
+    pointLight.constant=1.0f;
+    pointLight.linear=0.09f;
+    pointLight.quadratic=0.42f;
+
     unsigned int skyboxVAO, skyboxVBO;
     glGenVertexArrays(1, &skyboxVAO);
     glGenBuffers(1, &skyboxVBO);
@@ -249,6 +331,7 @@ int main()
 
     float degrees=0.00f;
     camera_box = programState->camera;
+
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = glfwGetTime();
@@ -260,6 +343,10 @@ int main()
 
         glClearColor(sun_prop.sky_color.x, sun_prop.sky_color.y, sun_prop.sky_color.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
+
 
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
@@ -291,6 +378,13 @@ int main()
             church_shader.setVec3("light.specular", moon_prop.specular);
             church_shader.setFloat("material.shininess", 0.1f);
             church_shader.setFloat("light.power", moon_prop.light_power);
+            church_shader.setVec3("pointLight.position",pointLight.position);
+            church_shader.setVec3("pointLight.diffuse",pointLight.diffuse);
+            //church_shader.setFloat("pointLight.power",pointLight.power);
+            church_shader.setVec3("pointLight.specular",pointLight.specular);
+            church_shader.setFloat("pointLight.constant", pointLight.constant);
+            church_shader.setFloat("pointLight.linear",pointLight.linear);
+            church_shader.setFloat("pointLight.quadratic",pointLight.quadratic);
         }
 
         church_shader.setMat4("projection", projection);
@@ -315,7 +409,7 @@ int main()
 
             model = glm::mat4(1.0f);
             model = glm::translate(model, sun_prop.position);
-            model = glm::scale(model, glm::vec3(0.15f));    // it's a bit too big for our scene, so scale it down
+            model = glm::scale(model, glm::vec3(0.1f));    // it's a bit too big for our scene, so scale it down
             sun_shader.setMat4("model", model);
             sun_model.Draw(sun_shader);
         }
@@ -336,7 +430,21 @@ int main()
             model = glm::scale(model, glm::vec3(0.15f));    // it's a bit too big for our scene, so scale it down
             moon_shader.setMat4("model", model);
             moon_model.Draw(moon_shader);
+
         }
+
+        gras_shader.use();
+        glm::mat4 model1=glm::mat4(1.0f);
+        model1=glm::translate(model1,glm::vec3(0.0,-0.75,0.0));
+        model1=glm::rotate(model1, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        model1=glm::scale(model1,glm::vec3(100.5f,15.3f,50.5f));
+        gras_shader.setMat4("model",model1);
+        gras_shader.setMat4("view",view);
+        gras_shader.setMat4("projection",projection);
+
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
         if(!sun_prop.active) {
             glDepthMask(GL_FALSE);
             glDepthFunc(GL_LEQUAL);
@@ -373,7 +481,9 @@ int main()
 
     delete programState;
 
-
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
     glDeleteVertexArrays(1, &skyboxVAO);
     glDeleteBuffers(1, &skyboxVAO);
 
