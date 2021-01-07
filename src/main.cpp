@@ -27,7 +27,6 @@ unsigned int load_cubemap(vector<std::string> faces);
 void calculate_day(float angle);
 void calculate_night(float angle);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-void skybox_rotate(Camera& camera_box, float xoffset, float yoffset);
 unsigned int loadTexture(const char *path);
 
 // settings
@@ -39,8 +38,6 @@ float lastX = SCR_WIDTH / 2.0f ;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 bool firstMouse_box = true;
-float lastX_box = SCR_WIDTH / 2.0f ;
-float lastY_box = SCR_HEIGHT / 2.0f;
 
 // timing
 float deltaTime = 0.0f;
@@ -107,7 +104,6 @@ void ProgramState::SaveToDisk(string path){
 ProgramState* programState;
 void DrawImGui(ProgramState* programState);
 
-Camera camera_box;
 float moon_rotate=0.0f;
 
 int main()
@@ -327,7 +323,6 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
     float degrees=0.00f;
-    camera_box = programState->camera;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -375,6 +370,7 @@ int main()
         }
 
         church_shader.setVec3("pointLight.position",pointLight.position);
+        church_shader.setVec3("pointLight.ambient", pointLight.ambient);
         church_shader.setVec3("pointLight.diffuse",pointLight.diffuse);
         church_shader.setFloat("pointLight.power",moon_prop.light_power);
         church_shader.setVec3("pointLight.specular",pointLight.specular);
@@ -431,6 +427,7 @@ int main()
         glBindVertexArray(planeVAO);
         glBindTexture(GL_TEXTURE_2D, floorTexture);
         model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 1.1f, 0.0f));
         model = glm::scale(model, glm::vec3(2.6f));
         grass_shader.setMat4("model", model);
         grass_shader.setMat4("projection", projection);
@@ -446,10 +443,10 @@ int main()
             glDepthFunc(GL_LEQUAL);
             skybox_shader.use();
 
-            skybox_rotate(camera_box, programState->camera.Position.x, programState->camera.Position.y);
-            glm::mat4 view_box = camera_box.GetViewMatrix();
-
-            skybox_shader.setMat4("view", glm::mat4(glm::mat3(view_box)));
+            model = glm::mat4(1.0f);
+            model = glm::rotate(model, moon_rotate*0.007f, glm::vec3(-0.4f, 1.0f, -0.4f));
+            skybox_shader.setMat4("model", model);
+            skybox_shader.setMat4("view", glm::mat4(glm::mat3(view)));
             skybox_shader.setMat4("projection", projection);
             skybox_shader.setFloat("power", moon_prop.light_power);
 
@@ -533,9 +530,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     if(programState->ImGuiEnabled==false)
         programState->camera.ProcessMouseMovement(xoffset, yoffset);
 
-
-    camera_box.ProcessMouseMovement(xoffset, yoffset, false);
-
 }
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
@@ -613,29 +607,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
     }
-}
-
-void skybox_rotate(Camera& camera_box, float xpos, float ypos){
-
-    if(!sun_prop.active) {
-        if (firstMouse_box) {
-            lastX_box = xpos;
-            lastY_box = ypos;
-            firstMouse_box = false;
-        }
-    }
-    else
-        firstMouse_box=true;
-
-
-    float xoffset = xpos - lastX_box ;
-    float yoffset = lastY_box - ypos ; // reversed since y-coordinates go from bottom to top
-
-    lastX_box = xpos;
-    lastY_box = ypos;
-
-    float speed = programState->SunSpeed;
-    camera_box.ProcessMouseMovement(xoffset + speed*0.6f , yoffset, true);
 }
 
 unsigned int loadTexture(char const * path)
