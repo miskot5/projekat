@@ -344,8 +344,9 @@ int main()
 
         calculate_day(degrees);
         calculate_night(degrees+180);
-        if(programState->SunSpeedCheck)
-            programState->SunSpeed = 1.0f;
+        if(programState->SunSpeedCheck) {
+            programState->SunSpeed = 0.0f;
+        }
 
         church_shader.use();
 
@@ -400,7 +401,7 @@ int main()
 
             model = glm::mat4(1.0f);
             model = glm::translate(model, sun_prop.position);
-            model = glm::scale(model, glm::vec3(0.13f));    // it's a bit too big for our scene, so scale it down
+            model = glm::scale(model, glm::vec3(programState->SunScale));    // it's a bit too big for our scene, so scale it down
             sun_shader.setMat4("model", model);
             sun_model.Draw(sun_shader);
         }
@@ -490,7 +491,6 @@ void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         programState->camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -580,8 +580,8 @@ void DrawImGui(ProgramState* programState){
 
     {
         ImGui::Begin("Sun properties");
-        ImGui::DragFloat("Sun scale",&programState->SunScale,0.01f,0.05f,0.3f);
-        ImGui::DragFloat("SunSpeed",&programState->SunSpeed,0.1f,0.0f,2.0f);
+        ImGui::DragFloat("Sun scale",&programState->SunScale,0.02f,0.1f,0.3f);
+        ImGui::DragFloat("Sun speed",&programState->SunSpeed,0.1f,0.0f,2.0f);
         ImGui::Checkbox("Default speed",&programState->SunSpeedCheck);
         ImGui::End();
     }
@@ -607,6 +607,17 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
     }
+    if(key==GLFW_KEY_SPACE && action==GLFW_PRESS)
+        programState->SunSpeedCheck=true;
+    if(key==GLFW_KEY_ENTER && action==GLFW_PRESS)
+        programState->SunSpeedCheck=false;
+    if(key==GLFW_KEY_UP && action==GLFW_PRESS)
+        if(programState->SunSpeed<2.0f)
+            programState->SunSpeed+=0.1;
+    if(key==GLFW_KEY_DOWN && action==GLFW_PRESS)
+        if(programState->SunSpeed>0.05f)
+            programState->SunSpeed-=0.1;
+
 }
 
 unsigned int loadTexture(char const * path)
