@@ -609,8 +609,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
     if(key==GLFW_KEY_SPACE && action==GLFW_PRESS)
         programState->SunSpeedCheck=true;
-    if(key==GLFW_KEY_ENTER && action==GLFW_PRESS)
-        programState->SunSpeedCheck=false;
+    if(key==GLFW_KEY_ENTER && action==GLFW_PRESS) {
+        programState->SunSpeedCheck = false;
+        programState->SunSpeed=1.0f;
+    }
     if(key==GLFW_KEY_UP && action==GLFW_PRESS)
         if(programState->SunSpeed<2.0f)
             programState->SunSpeed+=0.1;
