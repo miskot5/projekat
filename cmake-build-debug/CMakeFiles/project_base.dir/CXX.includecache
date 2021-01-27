@@ -186,13 +186,13 @@ imgui.h
 TargetConditionals.h
 ../libs/imgui/include/TargetConditionals.h
 
-/home/miodrag/Desktop/projekat/src/main.cpp
+/home/jovan/Desktop/grafika/projekat/src/main.cpp
 imgui.h
-/home/miodrag/Desktop/projekat/src/imgui.h
+/home/jovan/Desktop/grafika/projekat/src/imgui.h
 imgui_impl_glfw.h
-/home/miodrag/Desktop/projekat/src/imgui_impl_glfw.h
+/home/jovan/Desktop/grafika/projekat/src/imgui_impl_glfw.h
 imgui_impl_opengl3.h
-/home/miodrag/Desktop/projekat/src/imgui_impl_opengl3.h
+/home/jovan/Desktop/grafika/projekat/src/imgui_impl_opengl3.h
 glad/glad.h
 -
 GLFW/glfw3.h

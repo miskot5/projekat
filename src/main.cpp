@@ -104,8 +104,6 @@ void ProgramState::SaveToDisk(string path){
 ProgramState* programState;
 void DrawImGui(ProgramState* programState);
 
-float moon_rotate=0.0f;
-
 int main()
 {
     // glfw: initialize and configure
@@ -323,6 +321,7 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
     float degrees=0.00f;
+    float moon_rotate=0.0f;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -417,7 +416,7 @@ int main()
             model = glm::translate(model, moon_prop.position);
             model = glm::rotate(model, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             model = glm::rotate(model, moon_rotate/20.0f, glm::vec3(-1.0f, -1.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(0.18f));    // it's a bit too big for our scene, so scale it down
+            model = glm::scale(model, glm::vec3(programState->SunScale*1.2));    // it's a bit too big for our scene, so scale it down
             moon_shader.setMat4("model", model);
             moon_model.Draw(moon_shader);
 
@@ -480,6 +479,8 @@ int main()
     glDeleteBuffers(1, &EBO);
     glDeleteVertexArrays(1, &skyboxVAO);
     glDeleteBuffers(1, &skyboxVAO);
+    glDeleteVertexArrays(1,&planeVAO);
+    glDeleteBuffers(1,&planeVBO);
 
     glfwTerminate();
     return 0;
@@ -619,6 +620,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if(key==GLFW_KEY_DOWN && action==GLFW_PRESS)
         if(programState->SunSpeed>0.05f)
             programState->SunSpeed-=0.1;
+
+    if(key==GLFW_KEY_RIGHT && action==GLFW_PRESS)
+        if(programState->SunScale<0.25f)
+            programState->SunScale+=0.02;
+    if(key==GLFW_KEY_LEFT && action==GLFW_PRESS)
+        if(programState->SunScale>=0.07f)
+            programState->SunScale-=0.02;
 
 }
 
